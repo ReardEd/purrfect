@@ -17,3 +17,6 @@
 
 /* v0.3 — veterinary helper */
 .vetFeature{display:grid;gap:10px;padding:19px;border:1px solid #eadce9;border-radius:24px;background:linear-gradient(130deg,#f4e9f4,#fff8f5);box-shadow:0 9px 22px #7554770a}.vetFeatureIcon{font-size:29px}.vetFeature b{font-size:16px;color:#47364d}.vetFeature p{font-size:13px;line-height:1.55;color:#927f92;margin:7px 0}.vetFeature .action{margin:0}.modal .notice p,.modal .callout p{line-height:1.55}.modal .card p{line-height:1.55}.modal .check{margin:12px 0}
+
+/* v0.4 — cloud and family */
+.familyBox{padding:13px;border:1px solid #f0e1ed;border-radius:16px;background:#fff;overflow-wrap:anywhere}.familyBox code{font-size:11px;word-break:break-all}.familyHint{font-size:12px;color:#867587;line-height:1.55}.familyState{padding:11px;border-radius:12px;background:#f4eaf5;color:#75597a;font-size:12px}.familyError{background:#fff0ef;color:#a34f57}.familyButtons{display:grid;gap:8px}.familyBox input{width:100%;padding:11px;border:1px solid #eaddea;border-radius:12px;min-width:0}.familyBox label{display:block;font-size:12px;font-weight:800;margin:7px 0}.familyBox .action{margin-top:9px}
