@@ -203,6 +203,46 @@ if(kind==='visit'){add('visits',{name:data.name,detail:data.detail,date:data.dat
 if(['note','vaccine','food'].includes(kind))return add(kind==='note'?'notes':kind==='vaccine'?'vaccines':'foods',{...data});}
 function download(){let blob=new Blob([JSON.stringify({...db,format:'purrfect-backup',version:1},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='purrfect-backup-'+TODAY()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Резервная копия скачана')}
 async function importData(){let f=document.getElementById('importFile')?.files[0];if(!f)return toast('Выберите файл');try{let j=JSON.parse(await f.text());if(!Array.isArray(j.pets)||!Array.isArray(j.events)||!Array.isArray(j.notes)||!Array.isArray(j.weights)||!Array.isArray(j.vaccines)||!Array.isArray(j.shopping)||!Array.isArray(j.foods)||!Array.isArray(j.visits))throw Error('Файл не похож на резервную копию Purrfect');if(!confirm('Заменить все данные в этом браузере?'))return;db={...structuredClone(initial),...j};save();closeModal();tab='home';render();toast('Данные восстановлены')}catch(e){toast('Ошибка импорта: '+e.message)}}
+
+function applyFoodImportText(){
+const field=document.getElementById('foodImportText'),form=field?.closest('form');if(!form)return;
+const raw=field.value.trim();if(!raw)return toast('Сначала вставьте или распознайте текст');
+const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+const analysis=lines.filter(x=>/(белк|протеин|жир|зол|клетчат|влажност|влаг|омега|кальци|фосфор|protein|moisture)/i.test(x)&&/\d[\d,.]*\s*%/.test(x));
+const ingredients=lines.filter(x=>/(ингредиент|состав\s*[:：]|ingredients\s*[:：])/i.test(x));
+const an=form.elements.namedItem('analysis'),ing=form.elements.namedItem('ingredients');
+if(analysis.length&&an)an.value=analysis.join('\n').slice(0,2000);
+if(ingredients.length&&ing)ing.value=ingredients.join('\n').slice(0,4000);
+if(!analysis.length&&!ingredients.length){if(ing)ing.value=raw.slice(0,4000);toast('Не удалось разделить данные — проверьте текст вручную')}
+else toast('Перенесено! Проверьте ингредиенты и все цифры.');
+}
+function loadFoodOcrScript(){
+if(window.Tesseract?.recognize)return Promise.resolve(window.Tesseract);
+if(window.foodOcrLoading)return window.foodOcrLoading;
+window.foodOcrLoading=new Promise((resolve,reject)=>{
+const sc=document.createElement('script');
+sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+sc.onload=()=>window.Tesseract?.recognize?resolve(window.Tesseract):reject(Error('Библиотека недоступна'));
+sc.onerror=()=>reject(Error('Не удалось скачать библиотеку'));
+document.head.appendChild(sc);
+}).catch(e=>{window.foodOcrLoading=null;throw e});
+return window.foodOcrLoading;
+}
+async function recognizeFoodLabel(){
+const input=document.getElementById('foodLabelPhoto'),status=document.getElementById('foodOcrStatus'),btn=document.querySelector('[data-act="recognizeFood"]');
+const file=input?.files?.[0];if(!file)return toast('Выберите фото этикетки');
+if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10*1024*1024)return toast('Нужно фото JPG, PNG или WebP до 10 МБ');
+if(btn)btn.disabled=true;if(status)status.textContent='Загрузка распознавания. Нужен интернет…';
+try{
+const ocr=await loadFoodOcrScript();
+const result=await ocr.recognize(file,'rus+eng',{logger:m=>{if(status&&m.status==='recognizing text')status.textContent='Распознавание: '+Math.round((m.progress||0)*100)+'%'}});
+const recognized=String(result.data?.text||'').trim(),output=document.getElementById('foodImportText');
+if(!output)return;if(!recognized){if(status)status.textContent='Текст не найден. Сделайте более чёткий снимок.';return}
+output.value=(output.value?output.value.trim()+'\n':'')+recognized.slice(0,Math.max(0,12000-output.value.length));
+if(status)status.textContent='Готово! Перенесите данные в поля и проверьте их. Фотография не сохранена.';
+}catch(err){if(status)status.textContent='Распознавание недоступно: '+(err.message||'ошибка')+'. Вставьте текст вручную.'}
+finally{if(btn)btn.disabled=false}
+}
 document.addEventListener('submit',e=>{if(e.target.id==='onboardForm'){e.preventDefault();submitForm('newPet',collect(e.target));return}if(e.target.matches('[data-form]')){e.preventDefault();submitForm(e.target.dataset.form,collect(e.target))}});
 document.addEventListener('click',e=>{let t=e.target.closest('[data-tab],[data-act]');if(!t)return;let newTab=t.dataset.tab;if(newTab){tab=newTab;closeModal();render();window.scrollTo(0,0);return}let action=t.dataset.act;if(action==='close')return closeModal();
 if(action.startsWith('editFood:')){draft.editFoodId=action.slice('editFood:'.length);openModal('editFood');return}
