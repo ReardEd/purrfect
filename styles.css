@@ -151,3 +151,12 @@ html[data-theme="dark"] .nutrientHead,html[data-theme="dark"] .nutrientRow{borde
 html[data-theme="dark"] .nutrientHead{color:#e1c5e7}
 html[data-theme="dark"] .nutritionParseWarning{color:#ffc3aa}
 @media(max-width:380px){.nutrientHead,.nutrientRow{font-size:10px;gap:5px}}
+
+/* v1.1 Smart Package */
+.smartImport{margin-bottom:16px;padding:14px;background:#f8f1fa}
+.smartImport .action{margin:10px 0;width:100%}
+.smartImport input[type="file"]{max-width:100%;padding:10px 0}
+.smartImport textarea{min-height:110px}
+html[data-theme="dark"] .smartImport{background:#3f3146}
+.foodEditRow{margin-top:12px}
+.foodEditRow .action{width:100%}
