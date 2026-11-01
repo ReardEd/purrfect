@@ -1,0 +1,40 @@
+// EXPERIMENTAL FIRESTORE RULES: only for a SEPARATE test project.
+// Create-only sandbox. Never publish these over Purrfect production rules.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(fid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/families/$(fid))
+        && request.auth.uid in get(/databases/$(database)/documents/families/$(fid)).data.members;
+    }
+    function approvedKind(kind) {
+      return kind in ['notes','weights','events','vaccines','foods','shopping','visits','foodReactions','noteTombstones'];
+    }
+    function validRecord(id) {
+      return request.resource.data is map
+        && request.resource.data.keys().hasAll(['id'])
+        && request.resource.data.id == id
+        && request.resource.size < 20000;
+    }
+    match /families/{fid} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['owner','members','createdAt'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.members == [request.auth.uid];
+      allow get: if signedIn() && request.auth.uid in resource.data.members;
+      allow list, update, delete: if false;
+      match /pets/{petId} {
+        allow get, list: if member(fid);
+        allow create: if member(fid) && validRecord(petId);
+        allow update, delete: if false;
+      }
+      match /records/{kind}/items/{recordId} {
+        allow get, list: if member(fid) && approvedKind(kind);
+        allow create: if member(fid) && approvedKind(kind) && validRecord(recordId);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
