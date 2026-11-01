@@ -93,3 +93,23 @@ html[data-theme="dark"] #app:before{opacity:.12;filter:saturate(1.25)}
 html[data-theme="dark"] .listItem .symbol{background:#5a4264;color:#f7e7fa;border:1px solid #856493}
 html[data-theme="dark"] .listItem .symbol img,html[data-theme="dark"] .listItem .symbol svg{filter:brightness(1.2)}
 .listItem .symbol{font-size:17px;line-height:1;overflow:hidden;white-space:nowrap}
+
+/* v0.7.2 — Cozy Background: vector decorations replace floating emojis */
+#app{background-color:#f8eff7;background-image:radial-gradient(ellipse at 95% 8%,#efdaebad,transparent 36%),radial-gradient(ellipse at 4% 63%,#e9dcef8c,transparent 44%),linear-gradient(165deg,#f8eff7 0%,#f4e9f3 45%,#eee8f4 100%)}
+#app:before{content:"";position:absolute;inset:0;min-height:100%;height:100%;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22310%22%20height%3D%22440%22%20viewBox%3D%220%200%20310%20440%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23a57da7%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cg%20transform%3D%22translate(258%2056)%20rotate(20)%22%3E%3Cpath%20d%3D%22M-15%208Q0-9%2015%208Q21%2023%200%2024Q-21%2023-15%208Z%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%22-19%22%20cy%3D%22-7%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%22-6%22%20cy%3D%22-15%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%229%22%20cy%3D%22-15%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%2222%22%20cy%3D%22-5%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate(31%20257)%22%3E%3Cpath%20d%3D%22M-22-5L-25-27L-8-16Q0-20%208-16L25-27L22-5Q27%2019%200%2022Q-27%2019-22-5Z%22%2F%3E%3Cpath%20d%3D%22M-7%206Q0%2011%207%206M0%204v8%22%2F%3E%3Ccircle%20cx%3D%22-10%22%20cy%3D%22-2%22%20r%3D%222%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Ccircle%20cx%3D%2210%22%20cy%3D%22-2%22%20r%3D%222%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate(275%20388)%20scale(.65)%22%3E%3Cpath%20d%3D%22M-15%208Q0-9%2015%208Q21%2023%200%2024Q-21%2023-15%208Z%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%22-19%22%20cy%3D%22-7%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%22-6%22%20cy%3D%22-15%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%229%22%20cy%3D%22-15%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3Cellipse%20cx%3D%2222%22%20cy%3D%22-5%22%20rx%3D%226%22%20ry%3D%229%22%20fill%3D%22%23a57da7%22%20stroke%3D%22none%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");background-size:310px 440px;background-position:center 40px;background-repeat:repeat;opacity:.27;pointer-events:none;z-index:0;white-space:normal;word-spacing:normal;letter-spacing:normal;filter:none}
+#app>header,#app>main,#app>.onboard{position:relative;z-index:1}
+.card{background:#fff8fc;border-color:#e8d7e7}
+main>.card:nth-of-type(3n+2),main>.card:nth-of-type(3n+2) .familyBox{background:#f7edf8}
+.metric{background:#fff8fc;border-color:#e9d9e8}
+.metric:nth-child(2n){background:#f7edf9}
+.familyBox{background:#fff9fc}
+.monthCard{background:#fff8fc}
+.selectedInfo{background:#f1e5f1}
+html[data-theme="dark"] #app:before{opacity:.25;filter:brightness(1.45) saturate(.9)}
+html[data-theme="dark"] #app{background-image:radial-gradient(ellipse at 90% 8%,#563b62a8,transparent 40%),radial-gradient(ellipse at 0% 65%,#43354e8f,transparent 46%),linear-gradient(165deg,#29232f,#2b2436 55%,#26212f)}
+html[data-theme="dark"] .card,html[data-theme="dark"] .metric,html[data-theme="dark"] .monthCard{background:#393040;border-color:#5f4b63}
+html[data-theme="dark"] main>.card:nth-of-type(3n+2){background:#43334a}
+html[data-theme="dark"] .metric:nth-child(2n){background:#41344b}
+html[data-theme="dark"] .familyBox{background:#392f42}
+html[data-theme="dark"] .selectedInfo{background:#49384e}
+@media (prefers-reduced-motion:reduce){#app:before{transition:none}}
