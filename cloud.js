@@ -3,6 +3,7 @@ import { firebaseConfig } from './firebase-config.js';
 let auth=null, store=null, api=null, account=null, familyId='', unsub=null, started=false, enabled=false, busy=false, timer=null, lastError='';
 let sdk=null;
 let dirty=false,conflicted=false,uploading=false,editSequence=0,baseRevision=null,baseKnown=false;
+let sessionGeneration=0,mergeOperation=null;
 const pendingKey=fid=>'purrfect_pending_'+fid;
 const revisionKey=fid=>'purrfect_revision_'+fid;
 function pendingSet(value){if(!familyId)return;try{value?localStorage.setItem(pendingKey(familyId),'1'):localStorage.removeItem(pendingKey(familyId))}catch(e){message('Недостаточно места для отметки несохранённых изменений.',true)}}
@@ -58,12 +59,15 @@ el.innerHTML='<div class="familyBox"><b>📋 Предварительный пр
 '<button id="familyCancelNoteMerge" class="action ghost" type="button">Отмена</button></div>';
 }
 async function commitNoteMerge(){
-if(!mergePreview||!conflicted||!enabled||!account)return;
-const preview=mergePreview,fid=familyId,uid=account.uid,accountAtStart=account,sequenceAtStart=editSequence;
+if(merging||mergeOperation||!mergePreview||!conflicted||!enabled||!account)return;
+const preview=mergePreview,fid=familyId,uid=account.uid,accountAtStart=account,sequenceAtStart=editSequence,generationAtStart=sessionGeneration;
+const ownsSession=()=>sessionGeneration===generationAtStart&&fid===familyId&&account===accountAtStart&&enabled;
+const operation=Symbol('note-merge');
 if(preview.fid!==fid||preview.plan.changed.length||preview.plan.invalid.length||!preview.plan.additions.length)throw Error('Проверка слияния не пройдена.');
 if(JSON.stringify(readLocal())!==preview.localSnapshot){mergePreview=null;throw Error('Локальные данные изменились. Повторите предварительный просмотр.')}
 if(!confirm('Добавить ТОЛЬКО '+preview.plan.additions.length+' новых заметок? Удалённые записи НЕ восстанавливаются. Все прочие локальные изменения, кроме этих заметок, НЕ переносятся. Обе резервные копии должны быть сохранены.'))return;
-merging=true;
+if(!ownsSession()||merging||mergeOperation)return;
+mergeOperation=operation;merging=true;
 try{
 const committed=await api.runTransaction(store,async tx=>{
 const ref=docState(fid),snap=await tx.get(ref);if(!snap.exists()||!snap.data()?.data)throw Error('База недоступна');
@@ -84,7 +88,7 @@ tx.update(ref,{data:updated,revision:(rev??0)+1,updatedAt:api.serverTimestamp(),
 return {data:updated,revision:(rev??0)+1};
 });
 // A successful server transaction is not permission to replace local edits made while it awaited Firestore.
-if(fid!==familyId||account!==accountAtStart||!enabled)return;
+if(!ownsSession()||mergeOperation!==operation)return;
 if(sequenceAtStart!==editSequence||JSON.stringify(readLocal())!==preview.localSnapshot){
  mergePreview=null;dirty=true;conflicted=true;pendingSet(true);
  message('Слияние добавило заметки в облако, но локальные данные изменились во время ожидания. Новые правки сохранены локально; облачная отправка заблокирована до повторной проверки конфликта. Скачайте резервную копию.',true);
@@ -93,9 +97,13 @@ if(sequenceAtStart!==editSequence||JSON.stringify(readLocal())!==preview.localSn
 clearTimeout(timer);editSequence++;dirty=false;conflicted=false;mergePreview=null;setBase(committed.revision);pendingSet(false);
 window.purrfectApplyCloud?.(committed.data);message('Добавлены '+preview.plan.additions.length+' заметок. Проверьте обе учётные записи ☁️');renderPanel();
 }catch(err){
-mergePreview=null;conflicted=true;
-message('Слияние не выполнено: '+(err?.message||String(err))+' Локальные данные сохранены.',true);renderPanel();
-}finally{merging=false}
+if(ownsSession()&&mergeOperation===operation){
+ mergePreview=null;conflicted=true;
+ message('Слияние не выполнено: '+(err?.message||String(err))+' Локальные данные сохранены.',true);renderPanel();
+}
+}finally{
+if(mergeOperation===operation){mergeOperation=null;merging=false}
+}
 }
 async function takeCloudVersion(){
 if(!familyId||!account)return;
@@ -112,7 +120,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function state(){return !firebaseConfig?'Облачный доступ требует настройки Firebase. Локальные данные сохранены.':!account?'Облако готово к входу. Локальные данные сохранены.':familyId&&enabled?'Общие данные подключены ☁️':`Вход: ${account.email}. Семья пока не подключена.`}
 function message(msg,bad=false){lastError=msg;const e=$('familyMessage');if(e){e.className='familyState'+(bad?' familyError':'');e.textContent=msg}}
 function fail(err){const code=err?.code||'';const friendly={ 'auth/invalid-email':'Проверьте адрес электронной почты.', 'auth/invalid-credential':'Неверная почта или пароль.', 'auth/email-already-in-use':'Этот адрес уже зарегистрирован.', 'auth/weak-password':'Выберите более надёжный пароль.', 'auth/too-many-requests':'Слишком много попыток. Повторите позже.', 'permission-denied':'Нет прав доступа к этой семье.'};message(friendly[code]||'Ошибка: '+(code||err?.message||String(err)),true)}
-function stop(){mergePreview=null;merging=false;if(unsub)unsub();unsub=null;enabled=false;familyId='';clearTimeout(timer);dirty=false;conflicted=false;uploading=false;baseKnown=false;baseRevision=null;editSequence++}
+function stop(){sessionGeneration++;mergeOperation=null;mergePreview=null;merging=false;if(unsub)unsub();unsub=null;enabled=false;familyId='';clearTimeout(timer);dirty=false;conflicted=false;uploading=false;baseKnown=false;baseRevision=null;editSequence++}
 function docState(fid){return api.doc(store,'families',fid,'shared','state')}
 function readLocal(){return window.purrfectLocalData?.()}
 async function upload(){
