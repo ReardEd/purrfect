@@ -211,15 +211,15 @@ const ingredientHead=/(?:^|[\s.;])(?:ИНГРЕДИЕНТЫ|СОСТАВ|INGREDI
 const additiveHead=/(?:^|[\s.;])(?:ДОБАВКИ|ПИЩЕВЫЕ ДОБАВКИ|ADDITIVES|ADDITIVES PER KG)\s*[:：]/i;
 const analysisHead=/(?:^|[\s.;])(?:СОДЕРЖАНИЕ ПИТАТЕЛЬНЫХ ВЕЩЕСТВ|АНАЛИТИЧЕСКИЕ КОМПОНЕНТЫ|АНАЛИТИЧЕСКИЙ СОСТАВ|ANALYTICAL CONSTITUENTS|ANALYTICAL COMPONENTS)\s*[:：]/i;
 const markers=[{type:'ingredients',rx:ingredientHead},{type:'additives',rx:additiveHead},{type:'analysis',rx:analysisHead}];
-const hits=markers.map(m=>{const match=m.rx.exec(compact);return match?{type:m.type,index:match.index+match[0].length}:null}).filter(Boolean).sort((a,b)=>a.index-b.index);
+const hits=markers.map(m=>{const match=m.rx.exec(compact);return match?{type:m.type,index:match.index+match[0].length,start:match.index}:null}).filter(Boolean).sort((a,b)=>a.index-b.index);
 let ingredients='',analysis='',hasIngredients=false,hasAnalysis=false;
 for(let i=0;i<hits.length;i++){
 const hit=hits[i],next=hits[i+1],end=next?compact.lastIndexOf(' ',next.index):compact.length;
-const section=compact.slice(hit.index,Math.max(hit.index,end)).trim().replace(/^[\s:;.,—–-]+|[\s:;.,—–-]+$/g,'').trim();
+const section=compact.slice(hit.index,next?next.start:compact.length).trim().replace(/^[\s:;.,—–-]+|[\s:;.,—–-]+$/g,'').trim();
 if(hit.type==='ingredients'&&section){ingredients=section;hasIngredients=true}
 if(hit.type==='analysis'&&section){analysis=section;hasAnalysis=true}
 }
-const names='белк(?:и|а|ов)?|протеин|жир(?:ы|а|ов)?|зол[аы]|клетчатк[аи]|влажност[ьи]|влаг[аи]|омега[ -]?[36]|кальци[йя]|фосфор|protein|fat|ash|fibre|fiber|moisture|omega[ -]?[36]';
+const names='бел(?:ок|ка|ки|ков)|протеин|жир(?:ы|а|ов)?|зол[аы]|клетчатк[аи]|влажност[ьи]|влаг[аи]|омега[ -]?[36]|кальци[йя]|фосфор|protein|fat|ash|fibre|fiber|moisture|omega[ -]?[36]';
 const pairs=[...compact.matchAll(new RegExp('(?:'+names+')\\s*[:=—–-]?\\s*\\d{1,3}(?:[.,]\\d{1,3})?\\s*%','giu'))].map(m=>m[0]);
 if(!hasAnalysis&&pairs.length){analysis=pairs.join(' · ');hasAnalysis=true}
 if(!hasIngredients){const without=compact.split(analysisHead)[0];const looksIngredients=/дегидрат|пшениц|рис|мяс|мук[а-и]|животн|субпродукт|дрожж|витамин|растительн|куриц|рыб|dehydrated|chicken|rice/i.test(without);if(looksIngredients&&without.length>35){ingredients=without.replace(/^.{0,50}?(?:СОСТАВ|ИНГРЕДИЕНТЫ)\s*[:：]/i,'').trim();hasIngredients=true}}
