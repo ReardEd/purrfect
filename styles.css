@@ -85,3 +85,11 @@ html[data-theme="dark"] .themeChoice{background:#473b50;color:#e9d7eb;border-col
 html[data-theme="dark"] .themeChoice.chosen{background:#8c64a0;color:#fff}
 html[data-theme="dark"] .foot{color:#c1acc6}
 html[data-theme="dark"] .mark,html[data-theme="dark"] .petpic,html[data-theme="dark"] .avatar{background:#684d70}
+
+/* v0.7.1 — improve dark-mode navigation paws and utility icons */
+html[data-theme="dark"] .tab.active:before{opacity:.48;color:#d5a7e4;filter:drop-shadow(0 0 4px #d7a0ec77)}
+html[data-theme="dark"] .tab.active:after{background:#735580c9;border-color:#b991c8}
+html[data-theme="dark"] #app:before{opacity:.12;filter:saturate(1.25)}
+html[data-theme="dark"] .listItem .symbol{background:#5a4264;color:#f7e7fa;border:1px solid #856493}
+html[data-theme="dark"] .listItem .symbol img,html[data-theme="dark"] .listItem .symbol svg{filter:brightness(1.2)}
+.listItem .symbol{font-size:17px;line-height:1;overflow:hidden;white-space:nowrap}
