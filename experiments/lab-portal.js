@@ -1,4 +1,4 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import { makeMigrationPlan } from './record-migration.js';
@@ -17,7 +17,8 @@ $('login').addEventListener('click',async()=>{
    const email=$('email').value.trim(),password=$('password').value;
    if(!apiKey||!appId||!email||!password)throw Error('Заполните API key, App ID, email и пароль.');
    if(!appId.startsWith('1:')||!appId.includes(':web:'))throw Error('Проверьте Web App ID.');
-   const app=initializeApp({apiKey,appId,authDomain:allowedProject+'.firebaseapp.com',projectId:allowedProject},'purrfect-lab-isolated');
+   const app=getApps().find(a=>a.name==='purrfect-lab-isolated')||initializeApp({apiKey,appId,authDomain:allowedProject+'.firebaseapp.com',projectId:allowedProject},'purrfect-lab-isolated');
+   if(app.options.apiKey!==apiKey||app.options.appId!==appId)throw Error('Конфигурация уже инициализирована с другими параметрами; перезагрузите страницу.');
    auth=getAuth(app);db=getFirestore(app);
    const result=await signInWithEmailAndPassword(auth,email,password);
    signedIn=result.user;fid='mirror-'+signedIn.uid;
