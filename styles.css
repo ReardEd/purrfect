@@ -20,3 +20,68 @@
 
 /* v0.4 — cloud and family */
 .familyBox{padding:13px;border:1px solid #f0e1ed;border-radius:16px;background:#fff;overflow-wrap:anywhere}.familyBox code{font-size:11px;word-break:break-all}.familyHint{font-size:12px;color:#867587;line-height:1.55}.familyState{padding:11px;border-radius:12px;background:#f4eaf5;color:#75597a;font-size:12px}.familyError{background:#fff0ef;color:#a34f57}.familyButtons{display:grid;gap:8px}.familyBox input{width:100%;padding:11px;border:1px solid #eaddea;border-radius:12px;min-width:0}.familyBox label{display:block;font-size:12px;font-weight:800;margin:7px 0}.familyBox .action{margin-top:9px}
+
+
+/* Purrfect v0.7 — Cozy UI: paws, navigation, profile photos, themes */
+#app{isolation:isolate;background-color:#faf5fa;background-image:
+radial-gradient(circle at 85% 8%,#f1dfeec9 0,transparent 190px),
+radial-gradient(circle at 0% 44%,#efe4f85c 0,transparent 260px),
+linear-gradient(160deg,#fdf9fc,#f8f0f8 55%,#f3eff9)}
+#app:before{content:"🐾   ♡   🐱";pointer-events:none;position:absolute;inset:230px 0 auto;min-height:70%;text-align:center;white-space:pre-wrap;word-spacing:8rem;line-height:24rem;letter-spacing:2rem;font-size:34px;opacity:.055;z-index:0}
+#app>header,#app>main,#app>.onboard{position:relative;z-index:1}
+.bottom{background:#ead8e8f2;border-top:1px solid #d9bdd8;box-shadow:0 -8px 24px #6b49671a;padding-top:10px}
+.tab{color:#775c78;font-size:10px;min-height:62px;position:relative;z-index:0}
+.tab .ic{position:relative;font-size:23px;display:grid;place-items:center;height:31px;min-width:36px}
+.tab.active{color:#66466d;background:transparent}
+.tab.active:before{content:"🐾";position:absolute;z-index:-1;top:0;font-size:50px;opacity:.17;line-height:1}
+.tab.active .ic{color:#673d71;font-weight:900}
+.tab.active:after{content:"";position:absolute;inset:3px 3px;border:1px solid #b78cb657;border-radius:20px;z-index:-2;background:#f4e7f2ac}
+.avatar{overflow:hidden;display:grid;place-items:center;padding:0;border:3px solid #fff7ff;width:48px;height:48px;box-shadow:0 4px 15px #a27d9b45}
+.avatar .petPhoto{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.petrow .petpic .petPhoto{border-radius:inherit}
+.themeChoices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.themeChoice{border:1px solid #d8bed5;border-radius:15px;background:#f7edf5;color:#795578;padding:12px 6px;font-weight:900}
+.themeChoice.chosen{background:#9e7799;color:white;border-color:#9e7799}
+@media(max-width:350px){.tab{font-size:9px}.tab.active:before{font-size:43px}}
+
+/* Dark theme — preserve readability across menus, forms and veterinary warnings */
+html[data-theme="dark"]{color-scheme:dark;background:#211d29}
+html[data-theme="dark"] body{background:#211d29;color:#e9deeb}
+html[data-theme="dark"] #app{background-color:#292330;background-image:radial-gradient(circle at 80% 9%,#503b58b3 0,transparent 220px),radial-gradient(circle at 0% 55%,#49334c80 0,transparent 220px),linear-gradient(160deg,#2c2633,#25222f)}
+html[data-theme="dark"] .brand strong,html[data-theme="dark"] .heading,html[data-theme="dark"] .pageHeading h1,html[data-theme="dark"] .sectionHead h2,html[data-theme="dark"] .petname,html[data-theme="dark"] .metric .val,html[data-theme="dark"] .modalheader h2,html[data-theme="dark"] .vetFeature b{color:#f5e9f4}
+html[data-theme="dark"] .brand small,html[data-theme="dark"] .eyebrow,html[data-theme="dark"] .sub,html[data-theme="dark"] .meta,html[data-theme="dark"] .muted,html[data-theme="dark"] .metric .lbl,html[data-theme="dark"] .listItem p,html[data-theme="dark"] .familyHint{color:#c4adc5}
+html[data-theme="dark"] .hero{background:linear-gradient(120deg,#513952,#574052 60%,#614a55)}
+html[data-theme="dark"] .hero .sub{color:#f0ddeb}
+html[data-theme="dark"] .hero:after{color:#ffffff25}
+html[data-theme="dark"] .card,html[data-theme="dark"] .metric,html[data-theme="dark"] .modal,html[data-theme="dark"] .familyBox{background:#37303e;border-color:#57475a;color:#f0e4f1}
+html[data-theme="dark"] .modal{background:#292330}
+html[data-theme="dark"] .tip{background:#39334a;border-color:#5c5270}
+html[data-theme="dark"] .tip p{color:#d6cce4}
+html[data-theme="dark"] .vetFeature{background:linear-gradient(130deg,#403447,#473745);border-color:#5f4b60}
+html[data-theme="dark"] .vetFeature p{color:#d4bed1}
+html[data-theme="dark"] .bottom{background:#3b3046f5;border-color:#644b6a;box-shadow:0 -8px 26px #0005}
+html[data-theme="dark"] .tab{color:#c7b0cf}
+html[data-theme="dark"] .tab.active{color:#f3daf5}
+html[data-theme="dark"] .tab.active .ic{color:#f9e6fc}
+html[data-theme="dark"] .tab.active:after{background:#72547588;border-color:#ae83b5a8}
+html[data-theme="dark"] .action{background:#9974a6;color:#fff}
+html[data-theme="dark"] .action.secondary,html[data-theme="dark"] .action.ghost,html[data-theme="dark"] .miniBtn,html[data-theme="dark"] .close,html[data-theme="dark"] .monthArrow,html[data-theme="dark"] .chip{background:#4d3d54;color:#f0dff1;border:1px solid #6c5473}
+html[data-theme="dark"] .field label{color:#d3bed8}
+html[data-theme="dark"] .field input,html[data-theme="dark"] .field select,html[data-theme="dark"] .field textarea,html[data-theme="dark"] .familyBox input,html[data-theme="dark"] .familyBox select{background:#292330;color:#f4eaf4;border-color:#715a77}
+html[data-theme="dark"] .calendarCell{background:#44364b;color:#f2e5ef}
+html[data-theme="dark"] .calendarCell.heatDay{background:#673f60}
+html[data-theme="dark"] .calendarCell.chosen{background:#9e70a8;color:white}
+html[data-theme="dark"] .monthHeader b{color:#f0e1f3}
+html[data-theme="dark"] .selectedInfo,html[data-theme="dark"] .photoUpload,html[data-theme="dark"] .callout{background:#48394f;color:#ead5e9}
+html[data-theme="dark"] .notice{background:#504436;color:#f3dbaa}
+html[data-theme="dark"] .notice.critical,html[data-theme="dark"] .danger{background:#5a343d;color:#ffd9dd;border-color:#844b5a}
+html[data-theme="dark"] .separator,html[data-theme="dark"] .listItem{border-color:#5b485d}
+html[data-theme="dark"] .separator{background:#5b485d}
+html[data-theme="dark"] .familyState{background:#534058;color:#f1def2}
+html[data-theme="dark"] .familyError{background:#5a343d;color:#ffd9dd}
+html[data-theme="dark"] .pill.purple{background:#5a4163;color:#efd1fb}
+html[data-theme="dark"] .pill{background:#654c38;color:#ffe0b2}
+html[data-theme="dark"] .themeChoice{background:#473b50;color:#e9d7eb;border-color:#765981}
+html[data-theme="dark"] .themeChoice.chosen{background:#8c64a0;color:#fff}
+html[data-theme="dark"] .foot{color:#c1acc6}
+html[data-theme="dark"] .mark,html[data-theme="dark"] .petpic,html[data-theme="dark"] .avatar{background:#684d70}
