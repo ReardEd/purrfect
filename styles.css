@@ -126,3 +126,12 @@ html[data-theme="dark"] .nutritionFinding.info{background:#51405f;color:#ebd9f6}
 html[data-theme="dark"] .nutritionFinding.ok{background:#354b3d;color:#d0f0da}
 html[data-theme="dark"] .nutritionFinding.warn{background:#594433;color:#ffe4bf}
 html[data-theme="dark"] .nutritionFinding span{background:#ffffff25}
+
+/* v0.9 care-history filters */
+.careFilters{display:flex;gap:8px;overflow-x:auto;padding:3px 0 12px;scrollbar-width:thin}
+.careFilter{border:1px solid #c7aacb;border-radius:999px;background:#f8f0f8;color:#765d7e;padding:9px 12px;white-space:nowrap;cursor:pointer;font:inherit;font-size:12px;font-weight:700}
+.careFilter.active{background:#9e79aa;color:#fff;border-color:#9e79aa}
+.careFilter:focus-visible{outline:3px solid #bb8aca;outline-offset:2px}
+.careCount{font-size:12px;opacity:.8;margin:10px 0}
+html[data-theme="dark"] .careFilter{background:#47384c;color:#f3dff4;border-color:#69536f}
+html[data-theme="dark"] .careFilter.active{background:#a47da9;color:#fff;border-color:#a47da9}
