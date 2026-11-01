@@ -48,18 +48,17 @@ service cloud.firestore {
       match /shared/{docId} {
         allow get: if docId == 'state' && familyMember(fid);
         allow list, delete: if false;
-        allow create, update: if docId == 'state' && familyMember(fid)
+        allow create: if docId == 'state' && familyMember(fid)
           && request.resource.data.keys().hasOnly(['data', 'revision', 'updatedAt', 'updatedBy'])
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.data is map
-          && (
-            (request.method == 'create'
-              && request.resource.data.get('revision', 0) == 0)
-            ||
-            (request.method == 'update'
-              && request.resource.data.revision is int
-              && request.resource.data.revision == resource.data.get('revision', 0) + 1)
-          );
+          && request.resource.data.get('revision', 0) == 0;
+        allow update: if docId == 'state' && familyMember(fid)
+          && request.resource.data.keys().hasOnly(['data', 'revision', 'updatedAt', 'updatedBy'])
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.data is map
+          && request.resource.data.revision is int
+          && request.resource.data.revision == resource.data.get('revision', 0) + 1;
       }
     }
   }
