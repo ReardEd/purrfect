@@ -135,3 +135,19 @@ html[data-theme="dark"] .nutritionFinding span{background:#ffffff25}
 .careCount{font-size:12px;opacity:.8;margin:10px 0}
 html[data-theme="dark"] .careFilter{background:#47384c;color:#f3dff4;border-color:#69536f}
 html[data-theme="dark"] .careFilter.active{background:#a47da9;color:#fff;border-color:#a47da9}
+
+/* Smart Nutrition 2.0: source percentages and dry-matter view */
+.nutritionNumbers{margin:14px 0 12px;padding:13px;border:1px solid #e4d1e7;border-radius:15px;background:#fffafc}
+.nutrientTable{width:100%;margin:10px 0;display:grid;gap:0}
+.nutrientHead,.nutrientRow{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.75fr) minmax(0,1.1fr);gap:8px;align-items:center;padding:9px 3px;border-bottom:1px solid #e9dce8;font-size:12px}
+.nutrientHead{font-weight:800;color:#79647e;font-size:11px}
+.nutrientHead span:not(:first-child),.nutrientRow span:last-child,.nutrientRow strong{text-align:right}
+.nutrientRow strong{font-weight:900;font-variant-numeric:tabular-nums}
+.nutrientRow span:last-child{font-variant-numeric:tabular-nums}
+.nutritionNumbers .meta{line-height:1.55;margin:9px 0;font-size:11px}
+.nutritionParseWarning{font-size:12px;font-weight:700;color:#a65337}
+html[data-theme="dark"] .nutritionNumbers{background:#3a2c40;border-color:#634d69}
+html[data-theme="dark"] .nutrientHead,html[data-theme="dark"] .nutrientRow{border-color:#614b67}
+html[data-theme="dark"] .nutrientHead{color:#e1c5e7}
+html[data-theme="dark"] .nutritionParseWarning{color:#ffc3aa}
+@media(max-width:380px){.nutrientHead,.nutrientRow{font-size:10px;gap:5px}}
