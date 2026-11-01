@@ -16,7 +16,7 @@ service cloud.firestore {
       return request.resource.data is map
         && request.resource.data.keys().hasAll(['id'])
         && request.resource.data.id == id
-        && request.resource.size < 20000;
+        && request.resource.data.keys().size() <= 30;
     }
     match /families/{fid} {
       allow create: if signedIn()
