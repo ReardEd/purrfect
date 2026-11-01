@@ -1,4 +1,4 @@
-/* Purrfect family sync v1.4 (optimistic transactions): opt-in Firebase; requires configured project + Firestore rules. */
+/* Purrfect family sync v1.4.1 (optimistic transactions): opt-in Firebase; requires configured project + Firestore rules. */
 import { firebaseConfig } from './firebase-config.js';
 let auth=null, store=null, api=null, account=null, familyId='', unsub=null, started=false, enabled=false, busy=false, timer=null, lastError='';
 let sdk=null;
@@ -53,22 +53,31 @@ const safeNames=plan.additions.slice(0,20).map(n=>'<li>'+esc(String(n.name||'З�
 el.innerHTML='<div class="familyBox"><b>📋 Предварительный просмотр слияния</b>'+
 '<p class="familyHint">Новых локальных заметок для добавления: <b>'+plan.additions.length+'</b>. Различающихся записей с одинаковым ID: <b>'+plan.changed.length+'</b>. Записей с неизвестным питомцем/ошибкой ID: <b>'+plan.invalid.length+'</b>. Удалённых или помеченных для удаления: <b>'+plan.removed.length+'</b>.</p>'+
 (plan.additions.length?'<ul>'+safeNames+'</ul>':'<p class="familyHint">Нет новых заметок для добавления.</p>')+
-'<p class="familyHint">Только новые заметки; удаления не объединяются. Заметки с отметками удаления исключены из добавления. Если есть разногласия об удалении, слияние блокируется. Локальную копию обязательно сохраните.</p>'+
-(plan.additions.length&&!plan.changed.length&&!plan.invalid.length&&!plan.removed.length?'<button id="familyCommitNoteMerge" class="action" type="button">✅ Подтвердить добавление '+plan.additions.length+' заметок</button>':'<p class="familyHint">Слияние заблокировано из-за неоднозначных записей или отсутствия новых заметок.</p>')+
+'<p class="familyHint">Только новые заметки; удаления не объединяются. Заметки с отметками удаления исключены из добавления. При разногласиях об удалении можно явно добавить ТОЛЬКО независимые новые заметки; удалённые не восстанавливаются. Локальную копию обязательно сохраните.</p>'+
+(plan.additions.length&&!plan.changed.length&&!plan.invalid.length?'<button id="familyCommitNoteMerge" class="action" type="button">✅ '+(plan.removed.length?'Добавить только безопасные новые заметки ('+plan.additions.length+'), НЕ восстанавливая удалённые':'Подтвердить добавление '+plan.additions.length+' заметок')+'</button>':'<p class="familyHint">Слияние заблокировано из-за неоднозначных записей или отсутствия новых заметок.</p>')+
 '<button id="familyCancelNoteMerge" class="action ghost" type="button">Отмена</button></div>';
 }
 async function commitNoteMerge(){
 if(!mergePreview||!conflicted||!enabled||!account)return;
 const preview=mergePreview,fid=familyId,uid=account.uid;
-if(preview.fid!==fid||preview.plan.changed.length||preview.plan.invalid.length||preview.plan.removed.length||!preview.plan.additions.length)throw Error('Проверка слияния не пройдена.');
+if(preview.fid!==fid||preview.plan.changed.length||preview.plan.invalid.length||!preview.plan.additions.length)throw Error('Проверка слияния не пройдена.');
 if(JSON.stringify(readLocal())!==preview.localSnapshot){mergePreview=null;throw Error('Локальные данные изменились. Повторите предварительный просмотр.')}
-if(!confirm('Объединить только перечисленные новые заметки с облачной базой? Сначала сохраните обе резервные копии. Остальные локальные различия не будут отправлены.'))return;
+if(!confirm('Добавить ТОЛЬКО '+preview.plan.additions.length+' новых заметок? Удалённые записи НЕ восстанавливаются. Все прочие локальные изменения, кроме этих заметок, НЕ переносятся. Обе резервные копии должны быть сохранены.'))return;
 merging=true;
 try{
 const committed=await api.runTransaction(store,async tx=>{
 const ref=docState(fid),snap=await tx.get(ref);if(!snap.exists()||!snap.data()?.data)throw Error('База недоступна');
 const current=snap.data(),rev=current.revision??null;
 if(rev!==preview.revision){const e=new Error('Облачная база изменилась. Повторите просмотр.');e.purrfectConflict=true;throw e}
+const freshPlan=planNoteMerge(JSON.parse(preview.localSnapshot),current.data);
+if(freshPlan.changed.length||freshPlan.invalid.length||freshPlan.additions.length!==preview.plan.additions.length
+  ||freshPlan.additions.some(n=>!preview.plan.additions.some(p=>sameRecord(p,n)))
+  ||freshPlan.removed.length!==preview.plan.removed.length){
+ throw Error('Состав слияния изменился. Повторите предварительный просмотр.');
+}
+const tombstones=new Set((current.data.noteTombstones||[]).map(x=>x.id));
+if(preview.plan.additions.some(n=>tombstones.has(n.id)||(current.data.notes||[]).some(x=>x.id===n.id)))
+ throw Error('Обнаружена повторная или удалённая заметка. Запись отменена.');
 const updated={...current.data,notes:[...(current.data.notes||[]),...preview.plan.additions]};
 if(JSON.stringify(updated).length>720000)throw Error('Слишком большой документ для синхронизации.');
 tx.update(ref,{data:updated,revision:(rev??0)+1,updatedAt:api.serverTimestamp(),updatedBy:uid});
