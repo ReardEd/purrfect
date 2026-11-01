@@ -113,3 +113,16 @@ html[data-theme="dark"] .metric:nth-child(2n){background:#41344b}
 html[data-theme="dark"] .familyBox{background:#392f42}
 html[data-theme="dark"] .selectedInfo{background:#49384e}
 @media (prefers-reduced-motion:reduce){#app:before{transition:none}}
+
+/* v0.8 Smart Nutrition */
+.nutritionReport{display:grid;gap:8px;margin-top:13px}
+.nutritionFinding{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:13px;background:#f2eef8;color:#65566d;font-size:12px;line-height:1.5}
+.nutritionFinding span{display:grid;place-items:center;flex:0 0 23px;height:23px;border-radius:50%;font-weight:900;background:#ded5e9}
+.nutritionFinding p{margin:0}
+.nutritionFinding.ok{background:#eaf5ed;color:#476d52}
+.nutritionFinding.warn{background:#fff1e2;color:#906037}
+.nutritionFinding.info{background:#f1eaf8;color:#756085}
+html[data-theme="dark"] .nutritionFinding.info{background:#51405f;color:#ebd9f6}
+html[data-theme="dark"] .nutritionFinding.ok{background:#354b3d;color:#d0f0da}
+html[data-theme="dark"] .nutritionFinding.warn{background:#594433;color:#ffe4bf}
+html[data-theme="dark"] .nutritionFinding span{background:#ffffff25}
