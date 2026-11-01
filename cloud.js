@@ -74,6 +74,7 @@ try{const saved=localStorage.getItem(revisionKey(fid));baseRevision=saved===null
 unsub=api.onSnapshot(docState(fid),snap=>{
 if(!snap.exists()){message('Общая база ещё не содержит данных. Попросите владельца создать семейный профиль.');return}
 if(snap.metadata.hasPendingWrites)return;
+if(snap.metadata.fromCache){message('Нет свежего подтверждения от сервера. Локальные записи сохранены; облачную версию проверим при подключении.',true);return}
 const record=snap.data();
 if(!record?.data)return;
 const remoteRevision=record.revision??null;
