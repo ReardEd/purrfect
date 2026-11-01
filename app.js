@@ -224,14 +224,14 @@ const names='бел(?:ок|ка|ки|ков)|протеин|жир(?:ы|а|ов)
 const pairs=[...compact.matchAll(new RegExp('(?:'+names+')\\s*[:=—–-]?\\s*\\d{1,3}(?:[.,]\\d{1,3})?\\s*%','giu'))].map(m=>m[0]);
 result.pairs=pairs.length;
 if(!result.hasAnalysis&&pairs.length){result.analysis=pairs.join(' · ');result.hasAnalysis=true}
-if(result.hasAnalysis&&!parseFoodNutrients(result.analysis).values){result.warning='Проверьте проценты вручную.'}
+
 result.ingredients=result.ingredients.slice(0,4000);
 result.analysis=result.analysis.slice(0,2000);
 return result;
 }
 function cleanFoodIngredients(raw){
 let text=String(raw||'').replace(/\s+/g,' ').trim();
-text=text.replace(/^(?:RHE|RНE|THE)\s+(?=(?:СОСТАВ|ИНГРЕДИЕНТЫ)\b)/i,'');
+text=text.replace(/^(?:RHE|RНE|THE)\s+(?=(?:СОСТАВ|ИНГРЕДИЕНТЫ)(?:\s|:|$))/i,'');
 text=text.replace(/^(?:СОСТАВ|ИНГРЕДИЕНТЫ|INGREDIENTS)\s*[:：–—-]?\s*/i,'');
 text=text.split(/(?:^|[\s.;])(?:ПИЩЕВЫЕ\s+ДОБАВКИ|ДОБАВКИ|ADDITIVES|СОДЕРЖАНИЕ\s+ПИТАТЕЛЬНЫХ\s+ВЕЩЕСТВ|АНАЛИТИЧЕСКИЕ\s+КОМПОНЕНТЫ)\s*[:：–—-]?/i)[0];
 return text.replace(/^[\s:;.,—–-]+|[\s:;.,—–-]+$/g,'').trim();
