@@ -1,7 +1,25 @@
-/* Purrfect family sync v0.6: opt-in Firebase; requires configured project + Firestore rules. */
+/* Purrfect family sync v1.2 (optimistic transactions): opt-in Firebase; requires configured project + Firestore rules. */
 import { firebaseConfig } from './firebase-config.js';
 let auth=null, store=null, api=null, account=null, familyId='', unsub=null, started=false, enabled=false, busy=false, timer=null, lastError='';
 let sdk=null;
+let dirty=false,conflicted=false,uploading=false,editSequence=0,baseRevision=null,baseKnown=false;
+const pendingKey=fid=>'purrfect_pending_'+fid;
+const revisionKey=fid=>'purrfect_revision_'+fid;
+function pendingSet(value){if(!familyId)return;try{value?localStorage.setItem(pendingKey(familyId),'1'):localStorage.removeItem(pendingKey(familyId))}catch(e){message('Недостаточно места для отметки несохранённых изменений.',true)}}
+function setBase(rev){baseRevision=rev??null;baseKnown=true;if(familyId){try{localStorage.setItem(revisionKey(familyId),JSON.stringify(baseRevision))}catch{}}}
+function conflictMessage(){message('⚠️ Конфликт: семейные данные изменились на другом устройстве. Ваши локальные изменения сохранены. Скачайте резервную копию и выберите облачную версию либо разберите изменения вручную.',true)}
+function saveLocalBackup(){
+const data=readLocal();if(!data)return;
+const blob=new Blob([JSON.stringify({...data,format:'purrfect-backup',version:1},null,2)],{type:'application/json'});
+const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='purrfect-local-conflict-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function takeCloudVersion(){
+if(!familyId||!account)return;
+if(!confirm('Заменить локальные записи текущей облачной версией? Сначала обязательно скачайте локальную резервную копию.'))return;
+const snap=await api.getDocFromServer(docState(familyId));if(!snap.exists()||!snap.data()?.data)throw Error('Облачные данные недоступны');
+const record=snap.data();dirty=false;conflicted=false;editSequence++;clearTimeout(timer);setBase(record.revision??null);pendingSet(false);
+window.purrfectApplyCloud?.(record.data);message('Загружена актуальная облачная версия ☁️');renderPanel();
+}
 const familyKey=(uid)=>'purrfect_family_'+uid;
 const inviteId=(()=>{try{return new URL(location.href).searchParams.get('invite')||''}catch{return ''}})();
 const inviteUrl=fid=>`${location.origin}${location.pathname}?invite=${encodeURIComponent(fid)}`;
@@ -10,12 +28,67 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function state(){return !firebaseConfig?'Облачный доступ требует настройки Firebase. Локальные данные сохранены.':!account?'Облако готово к входу. Локальные данные сохранены.':familyId&&enabled?'Общие данные подключены ☁️':`Вход: ${account.email}. Семья пока не подключена.`}
 function message(msg,bad=false){lastError=msg;const e=$('familyMessage');if(e){e.className='familyState'+(bad?' familyError':'');e.textContent=msg}}
 function fail(err){const code=err?.code||'';const friendly={ 'auth/invalid-email':'Проверьте адрес электронной почты.', 'auth/invalid-credential':'Неверная почта или пароль.', 'auth/email-already-in-use':'Этот адрес уже зарегистрирован.', 'auth/weak-password':'Выберите более надёжный пароль.', 'auth/too-many-requests':'Слишком много попыток. Повторите позже.', 'permission-denied':'Нет прав доступа к этой семье.'};message(friendly[code]||'Ошибка: '+(code||err?.message||String(err)),true)}
-function stop(){if(unsub)unsub();unsub=null;enabled=false;familyId='';clearTimeout(timer)}
+function stop(){if(unsub)unsub();unsub=null;enabled=false;familyId='';clearTimeout(timer);dirty=false;conflicted=false;uploading=false;baseKnown=false;baseRevision=null;editSequence++}
 function docState(fid){return api.doc(store,'families',fid,'shared','state')}
 function readLocal(){return window.purrfectLocalData?.()}
-async function upload(){if(!enabled||!familyId||!account)return;const data=readLocal();if(!data)return;let length=JSON.stringify(data).length;if(length>720000){message('Данные слишком велики для одного облачного документа. Скачайте резервную копию; синхронизация остановлена.',true);return}try{await api.setDoc(docState(familyId),{data,updatedAt:api.serverTimestamp(),updatedBy:account.uid});message('Изменения сохранены в облаке ☁️')}catch(e){fail(e)}}
-function localChanged(){if(!enabled||!familyId)return;clearTimeout(timer);timer=setTimeout(upload,850)}
-function watch(fid){stop();familyId=fid;enabled=true;localStorage.setItem(familyKey(account.uid),fid);unsub=api.onSnapshot(docState(fid),snap=>{if(!snap.exists()){message('Общая база ещё не содержит данных. Попросите владельца создать семейный профиль.');return}if(snap.metadata.hasPendingWrites)return;const record=snap.data();if(record?.data){const local=readLocal();if(JSON.stringify(local)!==JSON.stringify(record.data))window.purrfectApplyCloud?.(record.data)}renderPanel()},e=>{stop();fail(e);renderPanel()});renderPanel()}
+async function upload(){
+if(!enabled||!familyId||!account||uploading||conflicted||!dirty)return;
+if(!baseKnown){message('Ждём исходную версию семейных данных перед записью.',true);return}
+const fid=familyId,uid=account.uid,sequence=editSequence,data=readLocal();
+if(!data)return;
+if(JSON.stringify(data).length>720000){message('Данные слишком велики для одного облачного документа. Скачайте резервную копию; синхронизация остановлена.',true);return}
+uploading=true;
+try{
+const nextRevision=await api.runTransaction(store,async tx=>{
+const snap=await tx.get(docState(fid));
+if(!snap.exists())throw Error('Семейная база недоступна');
+const current=snap.data(),actualRevision=current?.revision??null;
+if(actualRevision!==baseRevision){const err=new Error('Конфликт ревизий');err.purrfectConflict=true;throw err}
+const revision=(actualRevision??0)+1;
+tx.update(docState(fid),{data,revision,updatedAt:api.serverTimestamp(),updatedBy:uid});
+return revision;
+});
+if(fid!==familyId)return;
+setBase(nextRevision);
+if(sequence===editSequence){dirty=false;pendingSet(false);message('Изменения сохранены в облаке ☁️')}
+else{dirty=true;pendingSet(true);message('Сохраняем новые изменения…')}
+}catch(err){
+if(fid!==familyId)return;
+if(err.purrfectConflict){conflicted=true;conflictMessage();renderPanel()}
+else fail(err);
+}finally{
+uploading=false;
+if(fid===familyId&&dirty&&!conflicted&&sequence!==editSequence){clearTimeout(timer);timer=setTimeout(upload,400)}
+}
+}
+function localChanged(){
+if(!enabled||!familyId)return;
+dirty=true;editSequence++;pendingSet(true);
+if(conflicted){conflictMessage();return}
+clearTimeout(timer);timer=setTimeout(upload,850);
+}
+function watch(fid){
+stop();familyId=fid;enabled=true;localStorage.setItem(familyKey(account.uid),fid);
+dirty=localStorage.getItem(pendingKey(fid))==='1';
+try{const saved=localStorage.getItem(revisionKey(fid));baseRevision=saved===null?null:JSON.parse(saved);baseKnown=saved!==null}catch{baseRevision=null;baseKnown=false}
+unsub=api.onSnapshot(docState(fid),snap=>{
+if(!snap.exists()){message('Общая база ещё не содержит данных. Попросите владельца создать семейный профиль.');return}
+if(snap.metadata.hasPendingWrites)return;
+const record=snap.data();
+if(!record?.data)return;
+const remoteRevision=record.revision??null;
+if(dirty){
+if(!baseKnown){conflicted=true;conflictMessage();renderPanel();return}
+if(remoteRevision!==baseRevision&&!uploading){conflicted=true;conflictMessage();renderPanel();return}
+if(!uploading&&!conflicted){clearTimeout(timer);timer=setTimeout(upload,850)}
+}else{
+setBase(remoteRevision);
+const local=readLocal();if(JSON.stringify(local)!==JSON.stringify(record.data))window.purrfectApplyCloud?.(record.data);
+}
+renderPanel();
+},e=>{stop();fail(e);renderPanel()});
+renderPanel();
+}
 async function begin(){if(started||!firebaseConfig?.apiKey||!firebaseConfig?.projectId)return;started=true;try{const [app,authlib,fire]=await Promise.all([import('https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js')]);const fb=app.initializeApp(firebaseConfig);auth=authlib.getAuth(fb);store=fire.getFirestore(fb);api={...authlib,...fire};authlib.onAuthStateChanged(auth,u=>{account=u;stop();if(u){const fid=localStorage.getItem(familyKey(u.uid));if(fid)watch(fid)}renderPanel()})}catch(e){started=false;fail(e);renderPanel()}}
 function renderPanel(){const panel=$('family-panel');if(!panel)return;
 if(!firebaseConfig){panel.innerHTML=`<div class="familyBox"><b>☁️ Настройка Firebase ещё не выполнена</b><p class="familyHint">Для реальной регистрации и обмена записями нужно создать бесплатный проект Firebase и вписать параметры в <code>firebase-config.js</code>. Инструкция лежит в SETUP-FIREBASE.md в архиве.</p><p class="familyHint">До подключения всё работает локально, как раньше.</p></div>`;return}
@@ -23,7 +96,7 @@ if(!started){panel.innerHTML='<div class="familyState">Подключаем об
 if(!account){panel.innerHTML=`<div class="familyBox"><b>❤️ Войти в Purrfect</b><p class="familyHint">Каждому участнику семейного пространства нужен отдельный аккаунт. Пароль минимум 6 символов, лучше длиннее.</p><form id="familyAuth"><label>E-mail</label><input name="email" type="email" required autocomplete="username"><label>Пароль</label><input name="password" type="password" minlength="6" required autocomplete="current-password"><div class="familyButtons"><button class="action" name="mode" value="login">Войти</button><button class="action ghost" name="mode" value="signup">Зарегистрироваться</button></div></form><button class="action ghost" id="familyResetPassword" type="button">Забыли пароль?</button><p class="familyHint">Для восстановления используйте постоянную почту, к которой есть доступ.</p></div><div id="familyMessage" class="familyState">${esc(lastError||'')}</div>`;return}
 const header=`<div class="familyBox"><b>👤 ${esc(account.email)}</b><p class="familyHint">ID аккаунта (можно отправить владельцу семейного профиля):</p><code>${esc(account.uid)}</code><div class="familyButtons"><button class="action ghost" id="copyUid">📋 Скопировать мой ID</button><button class="action ghost" id="familyLogout">Выйти из аккаунта</button></div><p class="familyHint">Почта: ${account.emailVerified?'✅ подтверждена':'✉️ пока не подтверждена'}</p>${account.emailVerified?'':'<div class="familyButtons"><button class="action ghost" id="familyVerifyEmail">Отправить письмо подтверждения</button><button class="action ghost" id="familyCheckEmail">Проверить подтверждение</button></div>'}</div>`;
 if(!familyId){panel.innerHTML=header+`<div class="familyBox"><b>🐾 Создать семью</b><p class="familyHint">Используйте это на основном устройстве, где уже есть записи питомца. Данные будут загружены в новый семейный профиль.</p><button class="action" id="familyCreate">Создать общий профиль и загрузить мои данные</button></div><div class="familyBox"><b>❤️ Подключиться к семье</b><p class="familyHint">Попросите владельца сначала добавить ваш ID аккаунта, затем введите семейный ID.</p><form id="familyJoin"><label>Семейный ID</label><input name="fid" required placeholder="ID семейного профиля" value="${esc(inviteId)}"><button class="action ghost">Подключить общий профиль</button></form></div><div id="familyMessage" class="familyState">${esc(lastError||'')}</div>`;return}
-panel.innerHTML=header+`<div class="familyBox"><b>☁️ Общее пространство подключено</b><p class="familyHint">ID семьи:</p><code>${esc(familyId)}</code><button class="action ghost" id="copyFamily">📋 Скопировать ID семьи</button><button class="action ghost" id="copyFamilyInvite">🔗 Скопировать ссылку-приглашение</button><p class="familyHint">Ссылка только подставляет ID семьи. Владелец всё равно должен разрешить доступ по ID аккаунта участника.</p><p class="familyHint">Изменения синхронизируются через Firestore. Перед крупными изменениями сохраняйте резервные копии; одновременные правки одной записи могут конфликтовать.</p><div id="ownerTools"></div><button class="action ghost" id="disconnectFamily">Отключить семью на этом устройстве</button></div><div id="familyMessage" class="familyState">${esc(lastError||'')}</div>`;
+panel.innerHTML=header+`<div class="familyBox"><b>☁️ Общее пространство подключено</b><p class="familyHint">ID семьи:</p><code>${esc(familyId)}</code><button class="action ghost" id="copyFamily">📋 Скопировать ID семьи</button><button class="action ghost" id="copyFamilyInvite">🔗 Скопировать ссылку-приглашение</button><p class="familyHint">Ссылка только подставляет ID семьи. Владелец всё равно должен разрешить доступ по ID аккаунта участника.</p><p class="familyHint">Синхронизация использует проверку ревизии. При одновременных изменениях автоматическая запись останавливается, а локальные данные сохраняются для ручного разрешения конфликта.</p>${conflicted?`<div class="familyBox"><b>⚠️ Обнаружен конфликт изменений</b><p class="familyHint">Локальная версия не отправляется автоматически. Сначала сохраните её, затем при необходимости загрузите облачную.</p><button class="action" id="familyBackupConflict" type="button">📥 Скачать локальную резервную копию</button><button class="action ghost" id="familyUseCloud" type="button">☁️ Загрузить облачную версию</button></div>`:dirty?`<p class="familyHint">⏳ Есть ещё не отправленные изменения.</p>`:'' }<div id="ownerTools"></div><button class="action ghost" id="disconnectFamily">Отключить семью на этом устройстве</button></div><div id="familyMessage" class="familyState">${esc(lastError||'')}</div>`;
 api.getDoc(api.doc(store,'families',familyId)).then(s=>{if(!s.exists())return;const f=s.data(),el=$('ownerTools');if(!el)return;
 const isOwner=f.owner===account.uid;
 const rows=(f.members||[]).map(uid=>`<div class="familyMember"><span><b>${uid===f.owner?'👑 Владелец':uid===account.uid?'👤 Вы':'👤 Участник'}</b><br><small>${esc(uid)}</small></span>${isOwner&&uid!==account.uid?`<button class="action ghost" data-family-remove="${esc(uid)}" type="button">Убрать</button>`:''}</div>`).join('');
@@ -32,6 +105,6 @@ el.innerHTML=`<div class="separator"></div><b>👥 Участники семьи
 }).catch(fail)}
 function formData(el){return Object.fromEntries(new FormData(el).entries())}
 document.addEventListener('submit',async e=>{if(!['familyAuth','familyJoin','familyInvite','familyOfferTransfer'].includes(e.target.id))return;e.preventDefault();const form=e.target,values=formData(form);try{if(form.id==='familyAuth'){const mode=e.submitter?.value||'login';if(mode==='signup')await api.createUserWithEmailAndPassword(auth,values.email.trim(),values.password);else await api.signInWithEmailAndPassword(auth,values.email.trim(),values.password);message('Успешный вход ☁️');return}if(!account)throw Error('Сначала войдите в аккаунт');if(form.id==='familyJoin'){const fid=values.fid.trim();const m=await api.getDoc(api.doc(store,'families',fid));if(!m.exists())throw Error('Семья не найдена или нет доступа. Владелец должен добавить ваш ID.');if(!m.data().members.includes(account.uid))throw Error('Владелец пока не добавил этот аккаунт');watch(fid);return}if(form.id==='familyOfferTransfer'){if(!familyId)throw Error('Семья не выбрана');if(!confirm('Предложить передачу роли владельца выбранному участнику?'))return;const ref=api.doc(store,'families',familyId);const snap=await api.getDoc(ref);if(snap.data()?.owner!==account.uid)throw Error('Передавать роль может только текущий владелец');if(!snap.data().members.includes(values.uid)||values.uid===account.uid)throw Error('Выберите другого участника');await api.updateDoc(ref,{pendingOwner:values.uid});message('Предложение отправлено. Попросите участника открыть семейный доступ.');renderPanel();return}if(form.id==='familyInvite'){if(!familyId)throw Error('Семья не выбрана');const uid=values.uid.trim();if(!/^[\w-]{12,128}$/.test(uid))throw Error('Неверный ID участника');await api.updateDoc(api.doc(store,'families',familyId),{members:api.arrayUnion(uid)});message('Участник добавлен. Передайте ему ID семьи для подключения.');renderPanel()}}catch(err){fail(err)}});
-document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;try{if(t.dataset.familyRemove){if(!account||!familyId)return;const uid=t.dataset.familyRemove;if(!confirm('Отозвать доступ участника? Он больше не сможет читать и изменять семейные данные.'))return;const ref=api.doc(store,'families',familyId);const snap=await api.getDoc(ref);if(snap.data()?.owner!==account.uid||uid===account.uid)throw Error('Нельзя удалить владельца');if(snap.data()?.pendingOwner===uid)throw Error('Сначала отмените предложение передачи роли');await api.updateDoc(ref,{members:api.arrayRemove(uid)});message('Доступ участника отозван.');renderPanel();return}if(t.id==='familyCancelTransfer'){const ref=api.doc(store,'families',familyId);await api.updateDoc(ref,{pendingOwner:api.deleteField()});message('Предложение передачи роли отменено.');renderPanel();return}if(t.id==='familyAcceptTransfer'){if(!confirm('Принять роль владельца семьи?'))return;const ref=api.doc(store,'families',familyId);const snap=await api.getDoc(ref);if(snap.data()?.pendingOwner!==account.uid)throw Error('Предложение больше не активно');await api.updateDoc(ref,{owner:account.uid,pendingOwner:api.deleteField()});message('Теперь вы владелец семейного пространства 👑');renderPanel();return}if(t.id==='familyResetPassword'){const email=prompt('Укажите адрес электронной почты для восстановления пароля:');if(email===null)return;if(!email.trim())throw Error('Введите адрес электронной почты');await api.sendPasswordResetEmail(auth,email.trim());message('Если адрес зарегистрирован, на него придёт письмо для сброса пароля.');return}if(t.id==='familyVerifyEmail'){if(!account)return;await api.sendEmailVerification(account);message('Письмо подтверждения отправлено. Проверьте почту.');return}if(t.id==='familyCheckEmail'){if(!account)return;await account.reload();account=auth.currentUser;renderPanel();message(account.emailVerified?'Адрес электронной почты подтверждён ✅':'Почта ещё не подтверждена. Проверьте входящие и спам.');return}if(t.id==='familyLogout'){stop();await api.signOut(auth);return}if(t.id==='copyUid'){await navigator.clipboard.writeText(account.uid);message('ID аккаунта скопирован');return}if(t.id==='copyFamilyInvite'){await navigator.clipboard.writeText(inviteUrl(familyId));message('Ссылка-приглашение скопирована. Для входа владельцу нужно добавить ID аккаунта участника.');return}if(t.id==='copyFamily'){await navigator.clipboard.writeText(familyId);message('ID семьи скопирован');return}if(t.id==='disconnectFamily'){if(!confirm('Отключить синхронизацию на этом устройстве? Локальные данные останутся.'))return;stop();localStorage.removeItem(familyKey(account.uid));renderPanel();return}if(t.id==='familyCreate'){if(!confirm('Создать новый семейный профиль и загрузить текущие локальные записи? Сначала рекомендуется скачать резервную копию.'))return;const fid=crypto.randomUUID();busy=true;await api.setDoc(api.doc(store,'families',fid),{owner:account.uid,members:[account.uid],createdAt:api.serverTimestamp()});await api.setDoc(docState(fid),{data:readLocal(),updatedAt:api.serverTimestamp(),updatedBy:account.uid});busy=false;watch(fid);message('Общий профиль создан! Добавьте других участников по их ID.')}}catch(err){busy=false;fail(err)}});
+document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;try{if(t.id==='familyBackupConflict'){saveLocalBackup();message('Локальная резервная копия подготовлена.');return}if(t.id==='familyUseCloud'){await takeCloudVersion();return}if(t.dataset.familyRemove){if(!account||!familyId)return;const uid=t.dataset.familyRemove;if(!confirm('Отозвать доступ участника? Он больше не сможет читать и изменять семейные данные.'))return;const ref=api.doc(store,'families',familyId);const snap=await api.getDoc(ref);if(snap.data()?.owner!==account.uid||uid===account.uid)throw Error('Нельзя удалить владельца');if(snap.data()?.pendingOwner===uid)throw Error('Сначала отмените предложение передачи роли');await api.updateDoc(ref,{members:api.arrayRemove(uid)});message('Доступ участника отозван.');renderPanel();return}if(t.id==='familyCancelTransfer'){const ref=api.doc(store,'families',familyId);await api.updateDoc(ref,{pendingOwner:api.deleteField()});message('Предложение передачи роли отменено.');renderPanel();return}if(t.id==='familyAcceptTransfer'){if(!confirm('Принять роль владельца семьи?'))return;const ref=api.doc(store,'families',familyId);const snap=await api.getDoc(ref);if(snap.data()?.pendingOwner!==account.uid)throw Error('Предложение больше не активно');await api.updateDoc(ref,{owner:account.uid,pendingOwner:api.deleteField()});message('Теперь вы владелец семейного пространства 👑');renderPanel();return}if(t.id==='familyResetPassword'){const email=prompt('Укажите адрес электронной почты для восстановления пароля:');if(email===null)return;if(!email.trim())throw Error('Введите адрес электронной почты');await api.sendPasswordResetEmail(auth,email.trim());message('Если адрес зарегистрирован, на него придёт письмо для сброса пароля.');return}if(t.id==='familyVerifyEmail'){if(!account)return;await api.sendEmailVerification(account);message('Письмо подтверждения отправлено. Проверьте почту.');return}if(t.id==='familyCheckEmail'){if(!account)return;await account.reload();account=auth.currentUser;renderPanel();message(account.emailVerified?'Адрес электронной почты подтверждён ✅':'Почта ещё не подтверждена. Проверьте входящие и спам.');return}if(t.id==='familyLogout'){stop();await api.signOut(auth);return}if(t.id==='copyUid'){await navigator.clipboard.writeText(account.uid);message('ID аккаунта скопирован');return}if(t.id==='copyFamilyInvite'){await navigator.clipboard.writeText(inviteUrl(familyId));message('Ссылка-приглашение скопирована. Для входа владельцу нужно добавить ID аккаунта участника.');return}if(t.id==='copyFamily'){await navigator.clipboard.writeText(familyId);message('ID семьи скопирован');return}if(t.id==='disconnectFamily'){if(!confirm('Отключить синхронизацию на этом устройстве? Локальные данные останутся.'))return;stop();localStorage.removeItem(familyKey(account.uid));renderPanel();return}if(t.id==='familyCreate'){if(!confirm('Создать новый семейный профиль и загрузить текущие локальные записи? Сначала рекомендуется скачать резервную копию.'))return;const fid=crypto.randomUUID();busy=true;await api.setDoc(api.doc(store,'families',fid),{owner:account.uid,members:[account.uid],createdAt:api.serverTimestamp()});await api.setDoc(docState(fid),{data:readLocal(),updatedAt:api.serverTimestamp(),updatedBy:account.uid});busy=false;watch(fid);message('Общий профиль создан! Добавьте других участников по их ID.')}}catch(err){busy=false;fail(err)}});
 window.PurrfectCloud={renderPanel,statusText:state,localChanged};
 begin();
