@@ -12,6 +12,8 @@ assert.ok(start>=0&&end>start,'Could not isolate commitNoteMerge');
 
 function makeHarness() {
  let resolveTransaction;
+ let calls=0, rejectTransaction;
+ let transactionShouldReject=false;
  let live={pets:[{id:'p'}],notes:[{id:'new',petId:'p'}],weights:[]};
  const snapshot=JSON.stringify(live);
  const added={id:'new',petId:'p'};
@@ -20,7 +22,7 @@ function makeHarness() {
  const account={uid:'test-user'};
  const context={
   mergePreview:preview,conflicted:true,enabled:true,account,familyId:'family-a',
-  editSequence:3,dirty:true,merging:false,timer:null,
+  editSequence:3,dirty:true,merging:false,mergeOperation:null,sessionGeneration:0,timer:null,
   readLocal:()=>live,confirm:()=>true,clearTimeout:()=>{},
   docState:fid=>fid, pendingSet:value=>{pending=value},
   setBase:rev=>{context.baseRevision=rev},
@@ -29,7 +31,9 @@ function makeHarness() {
   sameRecord:(x,y)=>JSON.stringify(x)===JSON.stringify(y),
   window:{purrfectApplyCloud:data=>{applied=data;live=data}},
   api:{serverTimestamp:()=>0,runTransaction:async(_store,callback)=>{
-    await new Promise(resolve=>{resolveTransaction=resolve});
+    calls++;
+    await new Promise((resolve,reject)=>{resolveTransaction=resolve;rejectTransaction=reject});
+    if(transactionShouldReject)throw Error('emulated server failure');
     return callback({get:async()=>({exists:()=>true,data:()=>({revision:7,data:{pets:[{id:'p'}],notes:[],weights:[]}})}),update:()=>{}});
   }},
   store:{}
@@ -39,6 +43,13 @@ function makeHarness() {
   context,run:()=>context.commitNoteMerge(),
   waitUntilBlocked:async()=>{for(let i=0;i<50&&!resolveTransaction;i++)await Promise.resolve();assert.ok(resolveTransaction)},
   release:()=>resolveTransaction(),
+  reject:()=>{transactionShouldReject=true;resolveTransaction()},
+  calls:()=>calls,
+  switchSession:(family='family-b',user='other-user')=>{
+    context.sessionGeneration++;context.mergeOperation=null;context.merging=false;
+    context.familyId=family;context.account={uid:user};context.mergePreview=null;
+    context.conflicted=false;context.dirty=false;context.editSequence++;
+  },
   edit:()=>{live={...live,weights:[{id:'w-after',petId:'p',weight:3.5}]};context.editSequence++;context.dirty=true},
   getState:()=>({live,applied,notice,pending})
  };
@@ -68,4 +79,41 @@ test('snapshot change without editSequence increment also blocks replacement',as
  h.getState().live.weights.push({id:'w-direct',petId:'p'});h.release();await running;
  assert.equal(h.getState().live.weights[0].id,'w-direct');
  assert.equal(h.context.conflicted,true);
+});
+
+test('second merge invocation cannot start a second transaction',async()=>{
+ const h=makeHarness();const first=h.run();await h.waitUntilBlocked();
+ await h.run();assert.equal(h.calls(),1);
+ h.release();await first;
+ assert.equal(h.context.conflicted,false);
+ assert.equal(h.context.merging,false);
+});
+test('late transaction failure cannot poison another account',async()=>{
+ const h=makeHarness();const first=h.run();await h.waitUntilBlocked();
+ h.switchSession();h.reject();await first;
+ assert.equal(h.context.conflicted,false);
+ assert.equal(h.context.merging,false);
+});
+test('late success cannot overwrite another account',async()=>{
+ const h=makeHarness();const first=h.run();await h.waitUntilBlocked();
+ h.switchSession();h.release();await first;
+ assert.equal(h.getState().applied,null);
+ assert.equal(h.context.conflicted,false);
+});
+test('old transaction cannot clear merging owned by new session',async()=>{
+ const h=makeHarness();const first=h.run();await h.waitUntilBlocked();
+ h.switchSession();h.context.mergeOperation=Symbol('new-merge');
+ h.context.merging=true;h.release();await first;
+ assert.equal(h.context.merging,true);
+ assert.ok(h.context.mergeOperation);
+});
+test('A to B to A session transition invalidates old successful merge',async()=>{
+ const h=makeHarness();const first=h.run();await h.waitUntilBlocked();
+ const original=h.context.account;
+ h.switchSession();h.context.sessionGeneration++;h.context.familyId='family-a';
+ h.context.account=original;h.context.mergeOperation=Symbol('new-merge');
+ h.context.merging=true;h.release();await first;
+ assert.equal(h.getState().applied,null);
+ assert.equal(h.context.conflicted,false);
+ assert.equal(h.context.merging,true);
 });
