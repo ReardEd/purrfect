@@ -1,4 +1,4 @@
-/* Purrfect family sync v1.3.1 (optimistic transactions): opt-in Firebase; requires configured project + Firestore rules. */
+/* Purrfect family sync v1.4 (optimistic transactions): opt-in Firebase; requires configured project + Firestore rules. */
 import { firebaseConfig } from './firebase-config.js';
 let auth=null, store=null, api=null, account=null, familyId='', unsub=null, started=false, enabled=false, busy=false, timer=null, lastError='';
 let sdk=null;
@@ -27,13 +27,17 @@ const localNotes=Array.isArray(local?.notes)?local.notes:[];
 const remoteNotes=Array.isArray(remote?.notes)?remote.notes:[];
 const remotePets=new Set(Array.isArray(remote?.pets)?remote.pets.map(x=>x.id):[]);
 const remoteById=new Map(remoteNotes.map(n=>[n.id,n]));
-const additions=[],changed=[],invalid=[];
+const localDeleted=new Set((Array.isArray(local?.noteTombstones)?local.noteTombstones:[]).map(x=>x.id));
+const remoteDeleted=new Set((Array.isArray(remote?.noteTombstones)?remote.noteTombstones:[]).map(x=>x.id));
+const additions=[],changed=[],invalid=[],removed=[];
 for(const note of localNotes){
 if(!note||typeof note.id!=='string'||!note.id||typeof note.petId!=='string'||!remotePets.has(note.petId)){invalid.push(note);continue}
+if(remoteDeleted.has(note.id)||localDeleted.has(note.id)){removed.push(note);continue}
 if(remoteById.has(note.id)){if(!sameRecord(remoteById.get(note.id),note))changed.push(note);continue}
 additions.push(note);
 }
-return {additions,changed,invalid,remoteCount:remoteNotes.length,localCount:localNotes.length};
+for(const marker of Array.isArray(local?.noteTombstones)?local.noteTombstones:[]){if(marker?.id&&remoteById.has(marker.id))removed.push({id:marker.id,name:'Удалённая локально заметка'})}
+return {additions,changed,invalid,removed,remoteCount:remoteNotes.length,localCount:localNotes.length};
 }
 async function prepareNoteMerge(){
 if(!conflicted||!enabled||!familyId)return message('Слияние доступно только при конфликте.',true);
@@ -47,16 +51,16 @@ renderPanel();
 const el=$('familyMergePreview');if(!el)return;
 const safeNames=plan.additions.slice(0,20).map(n=>'<li>'+esc(String(n.name||'Заметка').slice(0,120))+' · '+esc(String(n.date||'').slice(0,20))+'</li>').join('');
 el.innerHTML='<div class="familyBox"><b>📋 Предварительный просмотр слияния</b>'+
-'<p class="familyHint">Новых локальных заметок для добавления: <b>'+plan.additions.length+'</b>. Различающихся записей с одинаковым ID: <b>'+plan.changed.length+'</b>. Записей с неизвестным питомцем/ошибкой ID: <b>'+plan.invalid.length+'</b>.</p>'+
+'<p class="familyHint">Новых локальных заметок для добавления: <b>'+plan.additions.length+'</b>. Различающихся записей с одинаковым ID: <b>'+plan.changed.length+'</b>. Записей с неизвестным питомцем/ошибкой ID: <b>'+plan.invalid.length+'</b>. Удалённых или помеченных для удаления: <b>'+plan.removed.length+'</b>.</p>'+
 (plan.additions.length?'<ul>'+safeNames+'</ul>':'<p class="familyHint">Нет новых заметок для добавления.</p>')+
-'<p class="familyHint">Только новые заметки; остальные различия (корм, вес, удаление заметок, настройки) НЕ объединяются. Если заметка удалена на другом устройстве, она может снова появиться после вашего согласия. Локальную копию обязательно сохраните.</p>'+
-(plan.additions.length&&!plan.changed.length&&!plan.invalid.length?'<button id="familyCommitNoteMerge" class="action" type="button">✅ Подтвердить добавление '+plan.additions.length+' заметок</button>':'<p class="familyHint">Слияние заблокировано из-за неоднозначных записей или отсутствия новых заметок.</p>')+
+'<p class="familyHint">Только новые заметки; удаления не объединяются. Заметки с отметками удаления исключены из добавления. Если есть разногласия об удалении, слияние блокируется. Локальную копию обязательно сохраните.</p>'+
+(plan.additions.length&&!plan.changed.length&&!plan.invalid.length&&!plan.removed.length?'<button id="familyCommitNoteMerge" class="action" type="button">✅ Подтвердить добавление '+plan.additions.length+' заметок</button>':'<p class="familyHint">Слияние заблокировано из-за неоднозначных записей или отсутствия новых заметок.</p>')+
 '<button id="familyCancelNoteMerge" class="action ghost" type="button">Отмена</button></div>';
 }
 async function commitNoteMerge(){
 if(!mergePreview||!conflicted||!enabled||!account)return;
 const preview=mergePreview,fid=familyId,uid=account.uid;
-if(preview.fid!==fid||preview.plan.changed.length||preview.plan.invalid.length||!preview.plan.additions.length)throw Error('Проверка слияния не пройдена.');
+if(preview.fid!==fid||preview.plan.changed.length||preview.plan.invalid.length||preview.plan.removed.length||!preview.plan.additions.length)throw Error('Проверка слияния не пройдена.');
 if(JSON.stringify(readLocal())!==preview.localSnapshot){mergePreview=null;throw Error('Локальные данные изменились. Повторите предварительный просмотр.')}
 if(!confirm('Объединить только перечисленные новые заметки с облачной базой? Сначала сохраните обе резервные копии. Остальные локальные различия не будут отправлены.'))return;
 merging=true;
