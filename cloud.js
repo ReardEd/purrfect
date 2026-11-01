@@ -1,4 +1,4 @@
-/* Purrfect family sync v1.3 (optimistic transactions): opt-in Firebase; requires configured project + Firestore rules. */
+/* Purrfect family sync v1.3.1 (optimistic transactions): opt-in Firebase; requires configured project + Firestore rules. */
 import { firebaseConfig } from './firebase-config.js';
 let auth=null, store=null, api=null, account=null, familyId='', unsub=null, started=false, enabled=false, busy=false, timer=null, lastError='';
 let sdk=null;
@@ -16,7 +16,12 @@ const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=u
 
 /* Merge beta: review and commit ONLY local-only notes, never overwrite an existing record. */
 let mergePreview=null,merging=false;
-const sameRecord=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function canonicalRecord(value){
+if(Array.isArray(value))return value.map(canonicalRecord);
+if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonicalRecord(value[key])]));
+return value;
+}
+const sameRecord=(a,b)=>JSON.stringify(canonicalRecord(a))===JSON.stringify(canonicalRecord(b));
 function planNoteMerge(local,remote){
 const localNotes=Array.isArray(local?.notes)?local.notes:[];
 const remoteNotes=Array.isArray(remote?.notes)?remote.notes:[];
