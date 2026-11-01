@@ -1,0 +1,42 @@
+{
+  "revision": 7,
+  "state": {
+    "pets": [
+      {
+        "id": "demo-cat",
+        "name": "Тестовая Мурка",
+        "species": "cat",
+        "breed": "Бенгальская"
+      }
+    ],
+    "notes": [
+      {
+        "id": "demo-note-a",
+        "petId": "demo-cat",
+        "date": "2026-11-01",
+        "name": "Тестовый дневник"
+      },
+      {
+        "id": "demo-note-b",
+        "petId": "demo-cat",
+        "date": "2026-11-01",
+        "name": "Вторая заметка"
+      }
+    ],
+    "weights": [
+      {
+        "id": "demo-weight",
+        "petId": "demo-cat",
+        "date": "2026-11-01",
+        "weight": 3.5
+      }
+    ],
+    "noteTombstones": [
+      {
+        "id": "demo-deleted",
+        "petId": "demo-cat",
+        "deletedAt": "2026-11-01T08:00:00Z"
+      }
+    ]
+  }
+}
