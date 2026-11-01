@@ -59,7 +59,7 @@ el.innerHTML='<div class="familyBox"><b>📋 Предварительный пр
 }
 async function commitNoteMerge(){
 if(!mergePreview||!conflicted||!enabled||!account)return;
-const preview=mergePreview,fid=familyId,uid=account.uid;
+const preview=mergePreview,fid=familyId,uid=account.uid,accountAtStart=account,sequenceAtStart=editSequence;
 if(preview.fid!==fid||preview.plan.changed.length||preview.plan.invalid.length||!preview.plan.additions.length)throw Error('Проверка слияния не пройдена.');
 if(JSON.stringify(readLocal())!==preview.localSnapshot){mergePreview=null;throw Error('Локальные данные изменились. Повторите предварительный просмотр.')}
 if(!confirm('Добавить ТОЛЬКО '+preview.plan.additions.length+' новых заметок? Удалённые записи НЕ восстанавливаются. Все прочие локальные изменения, кроме этих заметок, НЕ переносятся. Обе резервные копии должны быть сохранены.'))return;
@@ -83,7 +83,13 @@ if(JSON.stringify(updated).length>720000)throw Error('Слишком больш�
 tx.update(ref,{data:updated,revision:(rev??0)+1,updatedAt:api.serverTimestamp(),updatedBy:uid});
 return {data:updated,revision:(rev??0)+1};
 });
-if(fid!==familyId)return;
+// A successful server transaction is not permission to replace local edits made while it awaited Firestore.
+if(fid!==familyId||account!==accountAtStart||!enabled)return;
+if(sequenceAtStart!==editSequence||JSON.stringify(readLocal())!==preview.localSnapshot){
+ mergePreview=null;dirty=true;conflicted=true;pendingSet(true);
+ message('Слияние добавило заметки в облако, но локальные данные изменились во время ожидания. Новые правки сохранены локально; облачная отправка заблокирована до повторной проверки конфликта. Скачайте резервную копию.',true);
+ renderPanel();return;
+}
 clearTimeout(timer);editSequence++;dirty=false;conflicted=false;mergePreview=null;setBase(committed.revision);pendingSet(false);
 window.purrfectApplyCloud?.(committed.data);message('Добавлены '+preview.plan.additions.length+' заметок. Проверьте обе учётные записи ☁️');renderPanel();
 }catch(err){
