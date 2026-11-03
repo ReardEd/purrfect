@@ -1,0 +1,24 @@
+✔ failed auth target-context read must not permit cross-account family creation (35.572854ms)
+✔ auth context read failure hides previous pet using actual render and locks editing until recovery (13.490826ms)
+✔ new app with stale main cloud must not upload guest data into remembered family (59.036517ms)
+✔ old app with new cloud refuses boot before SDK import or transaction (24.152822ms)
+✔ storage key/envelope scope tampering is rejected before upload view (14.9065ms)
+✔ unknown/corrupt JSON in scope never becomes an empty profile (4.21572ms)
+✔ failed write preserves all earlier acknowledged entries (6.804535ms)
+✔ failure after actual write/readback keeps recoverable original and never deletes (5.473738ms)
+✔ stale writer cannot silently retire acknowledged pending branch (5.833094ms)
+✔ pending branch cannot be consumed by a remote snapshot (8.371937ms)
+✔ cross-project contexts do not collide (3.842985ms)
+✔ legacy export preserves raw bytes and pending/revision without guessing (3.208662ms)
+✔ interleaved writers retain both forks through close/reload and block ACK (26.514986ms)
+✔ remote snapshot racing new local write retains pending branch and forces conflict (9.013775ms)
+✔ missing parents and cycles are rejected without deleting raw entries (3.434114ms)
+✔ corrupted pending metadata never authorizes a clean legacy scoped payload (1.355634ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 329.967028
